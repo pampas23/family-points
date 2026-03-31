@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create:*)",
+      "Bash(export PATH=\"$PATH:/usr/local/bin:/opt/homebrew/bin\")",
+      "Bash(export PATH=\"$PATH:/usr/local/bin\")",
+      "Bash(npm_config_yes=true npx create-vite@latest . --template vue)",
+      "Read(//private/tmp/**)",
+      "Bash(npx create-vite@latest family-points --template vue)",
+      "Bash(/usr/local/bin/npm install:*)",
+      "Read(//usr/local/Cellar/node/23.11.0/bin/**)",
+      "Bash(/usr/local/bin/node --version)"
+    ]
+  }
+}
