@@ -190,7 +190,7 @@ async function logout() {
     <!-- Header -->
     <div class="bg-gradient-to-r from-orange-500 to-amber-400 px-4 pt-10 pb-6 rounded-b-3xl shadow-md">
       <div class="flex justify-between items-start mb-4">
-        <h1 class="text-white font-bold text-lg">🌟 集點大冒險</h1>
+        <h1 class="text-white font-bold text-lg">🧙 哈利波特集點卡</h1>
         <button @click="logout" class="text-orange-100 text-sm hover:text-white">登出</button>
       </div>
 

@@ -34,8 +34,8 @@ async function submit() {
   <div class="min-h-svh bg-gradient-to-b from-orange-400 to-amber-300 flex flex-col items-center justify-center p-6">
     <!-- Logo -->
     <div class="text-center mb-8">
-      <div class="text-7xl mb-3">⭐</div>
-      <h1 class="text-3xl font-bold text-white drop-shadow">集點大冒險</h1>
+      <div class="text-7xl mb-3">🧙</div>
+      <h1 class="text-3xl font-bold text-white drop-shadow">哈利波特集點卡</h1>
       <p class="text-orange-100 mt-1">努力就有獎勵！</p>
     </div>
 
