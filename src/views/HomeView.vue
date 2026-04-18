@@ -91,7 +91,7 @@ async function addManual(item) {
   }
 }
 
-// ── 快速新增手動記錄 ──────────────────────────────────────
+// ── 快速新增手動記錄（同時存入清單）────────────────────────
 const showQuickAdd = ref(false)
 const quickName = ref('')
 const quickPoints = ref(1)
@@ -101,7 +101,16 @@ async function submitQuickAdd() {
   if (!quickName.value.trim() || !quickPoints.value) return
   quickLoading.value = true
   try {
-    await appStore.addPointRecord(null, quickName.value.trim(), Number(quickPoints.value), null)
+    const name = quickName.value.trim()
+    const pts = Number(quickPoints.value)
+    // 找看看清單裡有沒有同名的手動項目
+    let item = appStore.pointItems.find(i => i.item_type === 'manual' && i.name === name)
+    if (!item) {
+      // 沒有就新增一個，讓它留在清單上
+      await appStore.addPointItem(name, pts, 'manual')
+      item = appStore.pointItems.find(i => i.item_type === 'manual' && i.name === name)
+    }
+    await appStore.addPointRecord(item?.id ?? null, name, pts, null)
     quickName.value = ''
     quickPoints.value = 1
     showQuickAdd.value = false
@@ -109,6 +118,64 @@ async function submitQuickAdd() {
     errorMsg.value = e.message
   } finally {
     quickLoading.value = false
+  }
+}
+
+
+// ── 今日記錄 刪修 ─────────────────────────────────────────
+const isTodayRecordsCollapsed = ref(localStorage.getItem('todayRecordsCollapsed') === 'true')
+watch(isTodayRecordsCollapsed, val => localStorage.setItem('todayRecordsCollapsed', String(val)))
+
+const todayStr = new Date().toISOString().split('T')[0]
+
+const todayRecords = computed(() =>
+  (appStore.recordsByDate[todayStr] || []).slice().sort(
+    (a, b) => new Date(b.created_at) - new Date(a.created_at)
+  )
+)
+
+// 編輯記錄
+const editingRecordId = ref(null)
+const editingRecordName = ref('')
+const editingRecordPoints = ref(0)
+const recordActionLoading = ref(null)
+
+function startEditRecord(record) {
+  editingRecordId.value = record.id
+  editingRecordName.value = record.item_name
+  editingRecordPoints.value = record.points
+}
+
+function cancelEditRecord() {
+  editingRecordId.value = null
+}
+
+async function saveEditRecord() {
+  if (!editingRecordName.value.trim()) return
+  recordActionLoading.value = editingRecordId.value
+  try {
+    await appStore.updatePointRecord(
+      editingRecordId.value,
+      editingRecordName.value.trim(),
+      Number(editingRecordPoints.value)
+    )
+    editingRecordId.value = null
+  } catch (e) {
+    errorMsg.value = e.message
+  } finally {
+    recordActionLoading.value = null
+  }
+}
+
+async function deleteRecord(id) {
+  if (!confirm('確定要刪除這筆記錄嗎？')) return
+  recordActionLoading.value = id
+  try {
+    await appStore.removePointRecord(id)
+  } catch (e) {
+    errorMsg.value = e.message
+  } finally {
+    recordActionLoading.value = null
   }
 }
 
@@ -309,6 +376,90 @@ async function logout() {
             </button>
           </div>
         </div>
+      </div>
+
+      <!-- Today's Records -->
+      <div class="mx-4 mt-5">
+        <!-- Header with toggle -->
+        <button
+          class="w-full flex items-center justify-between mb-3"
+          @click="isTodayRecordsCollapsed = !isTodayRecordsCollapsed"
+        >
+          <h2 class="font-bold text-gray-700">📝 今日記錄</h2>
+          <span class="text-gray-400 text-lg transition-transform duration-200" :class="isTodayRecordsCollapsed ? 'rotate-180' : ''">
+            ︿
+          </span>
+        </button>
+
+        <template v-if="!isTodayRecordsCollapsed">
+          <div v-if="todayRecords.length === 0" class="text-gray-400 text-sm text-center py-4 bg-white rounded-2xl">
+            今天還沒有任何記錄
+          </div>
+
+          <div v-else class="space-y-2">
+            <div
+              v-for="record in todayRecords"
+              :key="record.id"
+              class="bg-white rounded-2xl shadow-sm overflow-hidden"
+            >
+              <!-- View mode -->
+              <div
+                v-if="editingRecordId !== record.id"
+                class="flex items-center gap-3 p-4"
+              >
+                <span class="flex-1 text-gray-700 font-medium text-sm">{{ record.item_name }}</span>
+                <span
+                  class="font-bold text-sm px-2 py-1 rounded-full mr-1"
+                  :class="record.points > 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'"
+                >
+                  {{ record.points > 0 ? '+' : '' }}{{ record.points }} 點
+                </span>
+                <button
+                  @click="startEditRecord(record)"
+                  class="w-8 h-8 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center text-sm hover:bg-orange-200 transition-colors"
+                >✏️</button>
+                <button
+                  @click="deleteRecord(record.id)"
+                  :disabled="recordActionLoading === record.id"
+                  class="w-8 h-8 rounded-full bg-red-100 text-red-400 flex items-center justify-center text-sm hover:bg-red-200 transition-colors disabled:opacity-50"
+                >🗑</button>
+              </div>
+
+              <!-- Edit mode -->
+              <div v-else class="p-4 bg-orange-50 border-2 border-orange-200 rounded-2xl">
+                <p class="text-xs font-bold text-orange-500 mb-2">✏️ 編輯記錄</p>
+                <input
+                  v-model="editingRecordName"
+                  class="w-full border-2 border-orange-200 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:border-orange-400 bg-white"
+                  placeholder="記錄名稱"
+                />
+                <div class="flex gap-2 mb-3">
+                  <input
+                    v-model="editingRecordPoints"
+                    type="number"
+                    class="flex-1 border-2 border-orange-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400 bg-white"
+                    placeholder="點數"
+                  />
+                  <span
+                    class="px-3 py-2 rounded-xl text-sm font-bold"
+                    :class="Number(editingRecordPoints) >= 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'"
+                  >{{ Number(editingRecordPoints) > 0 ? '+' : '' }}{{ editingRecordPoints }} 點</span>
+                </div>
+                <div class="flex gap-2">
+                  <button
+                    @click="cancelEditRecord"
+                    class="flex-1 py-2 rounded-xl border-2 border-gray-200 text-gray-500 text-sm font-bold"
+                  >取消</button>
+                  <button
+                    @click="saveEditRecord"
+                    :disabled="recordActionLoading === editingRecordId || !editingRecordName.trim()"
+                    class="flex-1 py-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-400 text-white text-sm font-bold disabled:opacity-50"
+                  >{{ recordActionLoading === editingRecordId ? '儲存中...' : '✅ 儲存' }}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
     </template>
   </div>

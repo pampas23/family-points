@@ -180,6 +180,18 @@ export const useAppStore = defineStore('app', () => {
     pointRecords.value = pointRecords.value.filter(r => r.id !== id)
   }
 
+  async function updatePointRecord(id, itemName, points) {
+    const { data, error } = await supabase
+      .from('point_records')
+      .update({ item_name: itemName, points })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    const idx = pointRecords.value.findIndex(r => r.id === id)
+    if (idx !== -1) pointRecords.value[idx] = data
+  }
+
   async function toggleDailyItem(item) {
     const today = new Date().toISOString().split('T')[0]
     const existing = pointRecords.value.find(
@@ -278,7 +290,7 @@ export const useAppStore = defineStore('app', () => {
     totalPoints, recordsByDate, todayCheckedItemIds,
     loadChildren, addChild, updateChild, deleteChild, switchChild, loadChildData,
     loadPointItems, addPointItem, updatePointItem, deletePointItem,
-    loadPointRecords, addPointRecord, removePointRecord, toggleDailyItem,
+    loadPointRecords, addPointRecord, removePointRecord, updatePointRecord, toggleDailyItem,
     loadGoals, addGoal, updateGoal, deleteGoal, redeemGoal,
     reset,
   }
