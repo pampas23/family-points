@@ -8,9 +8,29 @@ const router = useRouter()
 const authStore = useAuthStore()
 const appStore = useAppStore()
 
-const showManualModal = ref(false)
 const actionLoading = ref(null) // item id being toggled
 const errorMsg = ref('')
+
+// 快速新增手動記錄
+const showQuickAdd = ref(false)
+const quickName = ref('')
+const quickPoints = ref(1)
+const quickLoading = ref(false)
+
+async function submitQuickAdd() {
+  if (!quickName.value.trim() || !quickPoints.value) return
+  quickLoading.value = true
+  try {
+    await appStore.addPointRecord(null, quickName.value.trim(), Number(quickPoints.value), null)
+    quickName.value = ''
+    quickPoints.value = 1
+    showQuickAdd.value = false
+  } catch (e) {
+    errorMsg.value = e.message
+  } finally {
+    quickLoading.value = false
+  }
+}
 
 const childColors = {
   orange: 'bg-orange-400',
@@ -159,13 +179,52 @@ async function logout() {
 
       <!-- Manual Items -->
       <div class="mx-4 mt-5">
-        <h2 class="font-bold text-gray-700 mb-3">✨ 手動記錄</h2>
-
-        <div v-if="manualItems.length === 0" class="text-gray-400 text-sm text-center py-4 bg-white rounded-2xl">
-          還沒有手動項目，前往設定新增吧！
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-bold text-gray-700">✨ 手動記錄</h2>
+          <button
+            @click="showQuickAdd = !showQuickAdd"
+            class="text-xs font-bold px-3 py-1.5 rounded-full transition-all"
+            :class="showQuickAdd ? 'bg-orange-500 text-white' : 'bg-orange-100 text-orange-600'"
+          >{{ showQuickAdd ? '✕ 關閉' : '＋ 快速新增' }}</button>
         </div>
 
-        <div v-else class="space-y-2">
+        <!-- 快速新增表單 -->
+        <div v-if="showQuickAdd" class="bg-white rounded-2xl p-4 shadow-sm mb-3 border-2 border-orange-200">
+          <p class="text-xs font-bold text-orange-500 mb-3">⚡ 快速新增記錄</p>
+          <input
+            v-model="quickName"
+            placeholder="記錄名稱，例如：表現很棒"
+            class="w-full border-2 border-orange-200 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:border-orange-400"
+            @keyup.enter="submitQuickAdd"
+          />
+          <div class="flex gap-2 mb-3">
+            <div class="flex-1">
+              <p class="text-xs text-gray-500 mb-1">點數（負數為扣點）</p>
+              <input
+                v-model="quickPoints"
+                type="number"
+                class="w-full border-2 border-orange-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-orange-400"
+              />
+            </div>
+            <div class="flex items-end">
+              <span
+                class="px-3 py-2 rounded-xl text-sm font-bold"
+                :class="Number(quickPoints) >= 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'"
+              >{{ Number(quickPoints) > 0 ? '+' : '' }}{{ quickPoints }} 點</span>
+            </div>
+          </div>
+          <button
+            @click="submitQuickAdd"
+            :disabled="quickLoading || !quickName.trim()"
+            class="w-full py-2.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-400 text-white font-bold text-sm disabled:opacity-50"
+          >{{ quickLoading ? '新增中...' : '✅ 確認新增' }}</button>
+        </div>
+
+        <div v-if="manualItems.length === 0 && !showQuickAdd" class="text-gray-400 text-sm text-center py-4 bg-white rounded-2xl">
+          點上方「快速新增」直接記錄，或前往設定建立固定項目
+        </div>
+
+        <div v-if="manualItems.length > 0" class="space-y-2">
           <div
             v-for="item in manualItems"
             :key="item.id"
