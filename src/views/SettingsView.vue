@@ -88,6 +88,42 @@ const itemError = ref('')
 const dailyItems = computed(() => appStore.pointItems.filter(i => i.item_type === 'daily'))
 const manualItems = computed(() => appStore.pointItems.filter(i => i.item_type === 'manual'))
 
+// 編輯項目
+const editingItemId = ref(null)
+const editingItemName = ref('')
+const editingItemPoints = ref(1)
+const editingItemType = ref('daily')
+
+function startEditItem(item) {
+  editingItemId.value = item.id
+  editingItemName.value = item.name
+  editingItemPoints.value = item.points
+  editingItemType.value = item.item_type
+}
+
+function cancelEditItem() {
+  editingItemId.value = null
+}
+
+async function saveEditItem() {
+  if (!editingItemName.value.trim() || !editingItemPoints.value) return
+  itemLoading.value = true
+  itemError.value = ''
+  try {
+    await appStore.updatePointItem(
+      editingItemId.value,
+      editingItemName.value.trim(),
+      Number(editingItemPoints.value),
+      editingItemType.value,
+    )
+    editingItemId.value = null
+  } catch (e) {
+    itemError.value = e.message
+  } finally {
+    itemLoading.value = false
+  }
+}
+
 async function addItem() {
   if (!newItemName.value.trim() || !newItemPoints.value) return
   itemLoading.value = true
@@ -117,6 +153,45 @@ async function deleteItem(id, name) {
 // ── Goals ─────────────────────────────────────────────────
 const showAddGoal = ref(false)
 const newGoalName = ref('')
+
+// 編輯目標
+const editingGoalId = ref(null)
+const editingGoalName = ref('')
+const editingGoalPoints = ref(10)
+const editingGoalLimit = ref('')
+const editingGoalExpiry = ref('')
+
+function startEditGoal(goal) {
+  editingGoalId.value = goal.id
+  editingGoalName.value = goal.name
+  editingGoalPoints.value = goal.required_points
+  editingGoalLimit.value = goal.quantity_limit ?? ''
+  editingGoalExpiry.value = goal.expires_at ?? ''
+}
+
+function cancelEditGoal() {
+  editingGoalId.value = null
+}
+
+async function saveEditGoal() {
+  if (!editingGoalName.value.trim() || !editingGoalPoints.value) return
+  goalLoading.value = true
+  goalError.value = ''
+  try {
+    await appStore.updateGoal(
+      editingGoalId.value,
+      editingGoalName.value.trim(),
+      Number(editingGoalPoints.value),
+      editingGoalLimit.value ? Number(editingGoalLimit.value) : null,
+      editingGoalExpiry.value || null,
+    )
+    editingGoalId.value = null
+  } catch (e) {
+    goalError.value = e.message
+  } finally {
+    goalLoading.value = false
+  }
+}
 const newGoalPoints = ref(10)
 const newGoalLimit = ref('')
 const newGoalExpiry = ref('')
@@ -294,14 +369,50 @@ async function deleteGoal(id, name) {
           <div
             v-for="item in dailyItems"
             :key="item.id"
-            class="flex items-center gap-3 bg-white rounded-2xl p-3 shadow-sm"
+            class="bg-white rounded-2xl shadow-sm overflow-hidden"
           >
-            <span class="flex-1 text-sm text-gray-700">{{ item.name }}</span>
-            <span class="text-xs font-bold px-2 py-0.5 rounded-full"
-              :class="item.points > 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'">
-              {{ item.points > 0 ? '+' : '' }}{{ item.points }}
-            </span>
-            <button @click="deleteItem(item.id, item.name)" class="text-red-400 text-xs px-1">刪除</button>
+            <!-- 一般顯示 -->
+            <div v-if="editingItemId !== item.id" class="flex items-center gap-3 p-3">
+              <span class="flex-1 text-sm text-gray-700">{{ item.name }}</span>
+              <span class="text-xs font-bold px-2 py-0.5 rounded-full"
+                :class="item.points > 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'">
+                {{ item.points > 0 ? '+' : '' }}{{ item.points }}
+              </span>
+              <button @click="startEditItem(item)" class="text-teal-500 text-xs px-1">編輯</button>
+              <button @click="deleteItem(item.id, item.name)" class="text-red-400 text-xs px-1">刪除</button>
+            </div>
+            <!-- 編輯模式 -->
+            <div v-else class="p-3">
+              <p class="text-xs font-bold text-teal-600 mb-2">✏️ 編輯項目</p>
+              <input
+                v-model="editingItemName"
+                class="w-full border-2 border-teal-200 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:border-teal-400"
+                placeholder="項目名稱"
+                @keyup.enter="saveEditItem"
+              />
+              <div class="flex gap-2 mb-2">
+                <div class="flex-1">
+                  <p class="text-xs text-gray-500 mb-1">點數</p>
+                  <input v-model="editingItemPoints" type="number"
+                    class="w-full border-2 border-teal-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-teal-400" />
+                </div>
+                <div class="flex-1">
+                  <p class="text-xs text-gray-500 mb-1">類型</p>
+                  <select v-model="editingItemType"
+                    class="w-full border-2 border-teal-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-teal-400 bg-white">
+                    <option value="daily">日常打卡</option>
+                    <option value="manual">手動記錄</option>
+                  </select>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <button @click="cancelEditItem" class="flex-1 py-1.5 rounded-xl border-2 border-gray-200 text-gray-500 text-xs font-bold">取消</button>
+                <button @click="saveEditItem" :disabled="itemLoading"
+                  class="flex-1 py-1.5 rounded-xl bg-teal-500 text-white text-xs font-bold disabled:opacity-50">
+                  {{ itemLoading ? '儲存中...' : '儲存' }}
+                </button>
+              </div>
+            </div>
           </div>
           <div v-if="dailyItems.length === 0" class="text-center text-gray-400 text-xs py-2">（無）</div>
         </div>
@@ -312,14 +423,50 @@ async function deleteGoal(id, name) {
           <div
             v-for="item in manualItems"
             :key="item.id"
-            class="flex items-center gap-3 bg-white rounded-2xl p-3 shadow-sm"
+            class="bg-white rounded-2xl shadow-sm overflow-hidden"
           >
-            <span class="flex-1 text-sm text-gray-700">{{ item.name }}</span>
-            <span class="text-xs font-bold px-2 py-0.5 rounded-full"
-              :class="item.points > 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'">
-              {{ item.points > 0 ? '+' : '' }}{{ item.points }}
-            </span>
-            <button @click="deleteItem(item.id, item.name)" class="text-red-400 text-xs px-1">刪除</button>
+            <!-- 一般顯示 -->
+            <div v-if="editingItemId !== item.id" class="flex items-center gap-3 p-3">
+              <span class="flex-1 text-sm text-gray-700">{{ item.name }}</span>
+              <span class="text-xs font-bold px-2 py-0.5 rounded-full"
+                :class="item.points > 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'">
+                {{ item.points > 0 ? '+' : '' }}{{ item.points }}
+              </span>
+              <button @click="startEditItem(item)" class="text-teal-500 text-xs px-1">編輯</button>
+              <button @click="deleteItem(item.id, item.name)" class="text-red-400 text-xs px-1">刪除</button>
+            </div>
+            <!-- 編輯模式 -->
+            <div v-else class="p-3">
+              <p class="text-xs font-bold text-teal-600 mb-2">✏️ 編輯項目</p>
+              <input
+                v-model="editingItemName"
+                class="w-full border-2 border-teal-200 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:border-teal-400"
+                placeholder="項目名稱"
+                @keyup.enter="saveEditItem"
+              />
+              <div class="flex gap-2 mb-2">
+                <div class="flex-1">
+                  <p class="text-xs text-gray-500 mb-1">點數</p>
+                  <input v-model="editingItemPoints" type="number"
+                    class="w-full border-2 border-teal-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-teal-400" />
+                </div>
+                <div class="flex-1">
+                  <p class="text-xs text-gray-500 mb-1">類型</p>
+                  <select v-model="editingItemType"
+                    class="w-full border-2 border-teal-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-teal-400 bg-white">
+                    <option value="daily">日常打卡</option>
+                    <option value="manual">手動記錄</option>
+                  </select>
+                </div>
+              </div>
+              <div class="flex gap-2">
+                <button @click="cancelEditItem" class="flex-1 py-1.5 rounded-xl border-2 border-gray-200 text-gray-500 text-xs font-bold">取消</button>
+                <button @click="saveEditItem" :disabled="itemLoading"
+                  class="flex-1 py-1.5 rounded-xl bg-teal-500 text-white text-xs font-bold disabled:opacity-50">
+                  {{ itemLoading ? '儲存中...' : '儲存' }}
+                </button>
+              </div>
+            </div>
           </div>
           <div v-if="manualItems.length === 0" class="text-center text-gray-400 text-xs py-2">（無）</div>
         </div>
@@ -396,17 +543,55 @@ async function deleteGoal(id, name) {
           <div
             v-for="goal in appStore.goals"
             :key="goal.id"
-            class="flex items-center gap-3 bg-white rounded-2xl p-3 shadow-sm"
+            class="bg-white rounded-2xl shadow-sm overflow-hidden"
           >
-            <div class="flex-1">
-              <p class="text-sm font-bold text-gray-700">{{ goal.name }}</p>
-              <p class="text-xs text-gray-400">
-                {{ goal.required_points }} 點
-                <span v-if="goal.quantity_limit !== null">・上限 {{ goal.quantity_limit }} 次</span>
-                <span v-if="goal.expires_at">・到期 {{ goal.expires_at }}</span>
-              </p>
+            <!-- 一般顯示 -->
+            <div v-if="editingGoalId !== goal.id" class="flex items-center gap-3 p-3">
+              <div class="flex-1">
+                <p class="text-sm font-bold text-gray-700">{{ goal.name }}</p>
+                <p class="text-xs text-gray-400">
+                  {{ goal.required_points }} 點
+                  <span v-if="goal.quantity_limit !== null">・上限 {{ goal.quantity_limit }} 次</span>
+                  <span v-if="goal.expires_at">・到期 {{ goal.expires_at }}</span>
+                </p>
+              </div>
+              <button @click="startEditGoal(goal)" class="text-teal-500 text-xs px-1">編輯</button>
+              <button @click="deleteGoal(goal.id, goal.name)" class="text-red-400 text-xs px-1">刪除</button>
             </div>
-            <button @click="deleteGoal(goal.id, goal.name)" class="text-red-400 text-xs px-1">刪除</button>
+            <!-- 編輯模式 -->
+            <div v-else class="p-3">
+              <p class="text-xs font-bold text-teal-600 mb-2">✏️ 編輯目標</p>
+              <input
+                v-model="editingGoalName"
+                class="w-full border-2 border-teal-200 rounded-xl px-3 py-2 text-sm mb-2 focus:outline-none focus:border-teal-400"
+                placeholder="目標名稱"
+                @keyup.enter="saveEditGoal"
+              />
+              <div class="flex gap-2 mb-2">
+                <div class="flex-1">
+                  <p class="text-xs text-gray-500 mb-1">需要點數</p>
+                  <input v-model="editingGoalPoints" type="number" min="1"
+                    class="w-full border-2 border-teal-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-teal-400" />
+                </div>
+                <div class="flex-1">
+                  <p class="text-xs text-gray-500 mb-1">數量上限（選填）</p>
+                  <input v-model="editingGoalLimit" type="number" min="1" placeholder="無限"
+                    class="w-full border-2 border-teal-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-teal-400" />
+                </div>
+              </div>
+              <div class="mb-2">
+                <p class="text-xs text-gray-500 mb-1">截止日期（選填）</p>
+                <input v-model="editingGoalExpiry" type="date"
+                  class="w-full border-2 border-teal-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-teal-400" />
+              </div>
+              <div class="flex gap-2">
+                <button @click="cancelEditGoal" class="flex-1 py-1.5 rounded-xl border-2 border-gray-200 text-gray-500 text-xs font-bold">取消</button>
+                <button @click="saveEditGoal" :disabled="goalLoading"
+                  class="flex-1 py-1.5 rounded-xl bg-teal-500 text-white text-xs font-bold disabled:opacity-50">
+                  {{ goalLoading ? '儲存中...' : '儲存' }}
+                </button>
+              </div>
+            </div>
           </div>
           <div v-if="appStore.goals.length === 0" class="text-center text-gray-400 text-xs py-3">（無目標）</div>
         </div>

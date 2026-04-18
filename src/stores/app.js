@@ -128,6 +128,18 @@ export const useAppStore = defineStore('app', () => {
     pointItems.value.push(data)
   }
 
+  async function updatePointItem(id, name, points, itemType) {
+    const { data, error } = await supabase
+      .from('point_items')
+      .update({ name, points, item_type: itemType })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    const idx = pointItems.value.findIndex(i => i.id === id)
+    if (idx !== -1) pointItems.value[idx] = data
+  }
+
   async function deletePointItem(id) {
     const { error } = await supabase.from('point_items').delete().eq('id', id)
     if (error) throw error
@@ -208,6 +220,23 @@ export const useAppStore = defineStore('app', () => {
     goals.value.push(data)
   }
 
+  async function updateGoal(id, name, requiredPoints, quantityLimit, expiresAt) {
+    const { data, error } = await supabase
+      .from('goals')
+      .update({
+        name,
+        required_points: requiredPoints,
+        quantity_limit: quantityLimit || null,
+        expires_at: expiresAt || null,
+      })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    const idx = goals.value.findIndex(g => g.id === id)
+    if (idx !== -1) goals.value[idx] = data
+  }
+
   async function deleteGoal(id) {
     const { error } = await supabase.from('goals').delete().eq('id', id)
     if (error) throw error
@@ -248,9 +277,9 @@ export const useAppStore = defineStore('app', () => {
     pointItems, pointRecords, goals, loading,
     totalPoints, recordsByDate, todayCheckedItemIds,
     loadChildren, addChild, updateChild, deleteChild, switchChild, loadChildData,
-    loadPointItems, addPointItem, deletePointItem,
+    loadPointItems, addPointItem, updatePointItem, deletePointItem,
     loadPointRecords, addPointRecord, removePointRecord, toggleDailyItem,
-    loadGoals, addGoal, deleteGoal, redeemGoal,
+    loadGoals, addGoal, updateGoal, deleteGoal, redeemGoal,
     reset,
   }
 })
