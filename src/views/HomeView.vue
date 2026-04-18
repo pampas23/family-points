@@ -1,17 +1,97 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useAppStore } from '../stores/app'
+import draggable from 'vuedraggable'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const appStore = useAppStore()
 
-const actionLoading = ref(null) // item id being toggled
+const actionLoading = ref(null)
 const errorMsg = ref('')
 
-// 快速新增手動記錄
+const childColors = {
+  orange: 'bg-orange-400',
+  pink: 'bg-pink-400',
+  purple: 'bg-purple-400',
+  green: 'bg-green-400',
+  blue: 'bg-blue-400',
+  teal: 'bg-teal-400',
+}
+
+const today = computed(() => {
+  const d = new Date()
+  const weekdays = ['日', '一', '二', '三', '四', '五', '六']
+  return `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日（週${weekdays[d.getDay()]}）`
+})
+
+const manualItems = computed(() =>
+  appStore.pointItems.filter(i => i.item_type === 'manual')
+)
+
+// ── 今日打卡收合 ─────────────────────────────────────────
+const isDailyCollapsed = ref(localStorage.getItem('dailyCollapsed') === 'true')
+watch(isDailyCollapsed, val => localStorage.setItem('dailyCollapsed', String(val)))
+
+// ── 拖拉排序 ──────────────────────────────────────────────
+const dailyItemsRaw = computed(() =>
+  appStore.pointItems.filter(i => i.item_type === 'daily')
+)
+
+const sortedDailyItems = ref([])
+
+function loadSortedItems() {
+  const childId = appStore.currentChildId
+  if (!childId) { sortedDailyItems.value = []; return }
+  const savedOrder = JSON.parse(localStorage.getItem(`dailyOrder_${childId}`) || '[]')
+  const items = [...dailyItemsRaw.value]
+  if (savedOrder.length > 0) {
+    items.sort((a, b) => {
+      const ai = savedOrder.indexOf(a.id)
+      const bi = savedOrder.indexOf(b.id)
+      if (ai === -1) return 1
+      if (bi === -1) return -1
+      return ai - bi
+    })
+  }
+  sortedDailyItems.value = items
+}
+
+watch(dailyItemsRaw, loadSortedItems, { immediate: true })
+watch(() => appStore.currentChildId, loadSortedItems)
+
+function onDragEnd() {
+  const childId = appStore.currentChildId
+  if (!childId) return
+  localStorage.setItem(`dailyOrder_${childId}`, JSON.stringify(sortedDailyItems.value.map(i => i.id)))
+}
+
+// ── 加點操作 ──────────────────────────────────────────────
+async function toggleDaily(item) {
+  actionLoading.value = item.id
+  try {
+    await appStore.toggleDailyItem(item)
+  } catch (e) {
+    errorMsg.value = e.message
+  } finally {
+    actionLoading.value = null
+  }
+}
+
+async function addManual(item) {
+  actionLoading.value = item.id
+  try {
+    await appStore.addPointRecord(item.id, item.name, item.points, null)
+  } catch (e) {
+    errorMsg.value = e.message
+  } finally {
+    actionLoading.value = null
+  }
+}
+
+// ── 快速新增手動記錄 ──────────────────────────────────────
 const showQuickAdd = ref(false)
 const quickName = ref('')
 const quickPoints = ref(1)
@@ -29,51 +109,6 @@ async function submitQuickAdd() {
     errorMsg.value = e.message
   } finally {
     quickLoading.value = false
-  }
-}
-
-const childColors = {
-  orange: 'bg-orange-400',
-  pink: 'bg-pink-400',
-  purple: 'bg-purple-400',
-  green: 'bg-green-400',
-  blue: 'bg-blue-400',
-  teal: 'bg-teal-400',
-}
-
-const dailyItems = computed(() =>
-  appStore.pointItems.filter(i => i.item_type === 'daily')
-)
-const manualItems = computed(() =>
-  appStore.pointItems.filter(i => i.item_type === 'manual')
-)
-
-const today = computed(() => {
-  const d = new Date()
-  const weekdays = ['日', '一', '二', '三', '四', '五', '六']
-  return `${d.getFullYear()} 年 ${d.getMonth() + 1} 月 ${d.getDate()} 日（週${weekdays[d.getDay()]}）`
-})
-
-async function toggleDaily(item) {
-  actionLoading.value = item.id
-  try {
-    await appStore.toggleDailyItem(item)
-  } catch (e) {
-    errorMsg.value = e.message
-  } finally {
-    actionLoading.value = null
-  }
-}
-
-async function addManual(item) {
-  actionLoading.value = item.id
-  showManualModal.value = false
-  try {
-    await appStore.addPointRecord(item.id, item.name, item.points, null)
-  } catch (e) {
-    errorMsg.value = e.message
-  } finally {
-    actionLoading.value = null
   }
 }
 
@@ -148,33 +183,60 @@ async function logout() {
     <template v-else-if="appStore.currentChild">
       <!-- Daily Checklist -->
       <div class="mx-4 mt-5">
-        <h2 class="font-bold text-gray-700 mb-3">📋 今日打卡</h2>
+        <!-- Header with toggle -->
+        <button
+          class="w-full flex items-center justify-between mb-3"
+          @click="isDailyCollapsed = !isDailyCollapsed"
+        >
+          <h2 class="font-bold text-gray-700">📋 今日打卡</h2>
+          <span class="text-gray-400 text-lg transition-transform duration-200" :class="isDailyCollapsed ? 'rotate-180' : ''">
+            ︿
+          </span>
+        </button>
 
-        <div v-if="dailyItems.length === 0" class="text-gray-400 text-sm text-center py-4 bg-white rounded-2xl">
-          還沒有日常項目，前往設定新增吧！
-        </div>
+        <template v-if="!isDailyCollapsed">
+          <div v-if="sortedDailyItems.length === 0" class="text-gray-400 text-sm text-center py-4 bg-white rounded-2xl">
+            還沒有日常項目，前往設定新增吧！
+          </div>
 
-        <div v-else class="space-y-2">
-          <button
-            v-for="item in dailyItems"
-            :key="item.id"
-            @click="toggleDaily(item)"
-            :disabled="actionLoading === item.id"
-            class="w-full flex items-center gap-3 bg-white rounded-2xl p-4 shadow-sm active:scale-98 transition-all"
-            :class="appStore.todayCheckedItemIds.has(item.id) ? 'border-2 border-green-400' : 'border-2 border-transparent'"
+          <draggable
+            v-else
+            v-model="sortedDailyItems"
+            item-key="id"
+            handle=".drag-handle"
+            :animation="150"
+            @end="onDragEnd"
+            class="space-y-2"
           >
-            <span class="text-2xl">
-              {{ appStore.todayCheckedItemIds.has(item.id) ? '✅' : '⬜' }}
-            </span>
-            <span class="flex-1 text-left font-medium text-gray-700">{{ item.name }}</span>
-            <span
-              class="font-bold text-sm px-2 py-1 rounded-full"
-              :class="item.points > 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'"
-            >
-              {{ item.points > 0 ? '+' : '' }}{{ item.points }} 點
-            </span>
-          </button>
-        </div>
+            <template #item="{ element: item }">
+              <div
+                class="flex items-center gap-3 bg-white rounded-2xl p-4 shadow-sm border-2 transition-all"
+                :class="appStore.todayCheckedItemIds.has(item.id) ? 'border-green-400' : 'border-transparent'"
+              >
+                <!-- 拖拉把手 -->
+                <span class="drag-handle cursor-grab active:cursor-grabbing text-gray-300 text-lg select-none px-1">⠿</span>
+
+                <!-- 勾選按鈕 -->
+                <button
+                  @click="toggleDaily(item)"
+                  :disabled="actionLoading === item.id"
+                  class="flex items-center gap-3 flex-1 text-left disabled:opacity-50"
+                >
+                  <span class="text-2xl">
+                    {{ appStore.todayCheckedItemIds.has(item.id) ? '✅' : '⬜' }}
+                  </span>
+                  <span class="flex-1 font-medium text-gray-700">{{ item.name }}</span>
+                  <span
+                    class="font-bold text-sm px-2 py-1 rounded-full"
+                    :class="item.points > 0 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-500'"
+                  >
+                    {{ item.points > 0 ? '+' : '' }}{{ item.points }} 點
+                  </span>
+                </button>
+              </div>
+            </template>
+          </draggable>
+        </template>
       </div>
 
       <!-- Manual Items -->
