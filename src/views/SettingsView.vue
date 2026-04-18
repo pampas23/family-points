@@ -12,6 +12,35 @@ const newChildColor = ref('orange')
 const childLoading = ref(false)
 const childError = ref('')
 
+// 編輯小孩
+const editingChildId = ref(null)
+const editingChildName = ref('')
+const editingChildColor = ref('orange')
+
+function startEdit(child) {
+  editingChildId.value = child.id
+  editingChildName.value = child.name
+  editingChildColor.value = child.color
+}
+
+function cancelEdit() {
+  editingChildId.value = null
+}
+
+async function saveEdit() {
+  if (!editingChildName.value.trim()) return
+  childLoading.value = true
+  childError.value = ''
+  try {
+    await appStore.updateChild(editingChildId.value, editingChildName.value.trim(), editingChildColor.value)
+    editingChildId.value = null
+  } catch (e) {
+    childError.value = e.message
+  } finally {
+    childLoading.value = false
+  }
+}
+
 const colorOptions = [
   { value: 'orange', label: '橘色', cls: 'bg-orange-400' },
   { value: 'pink', label: '粉紅', cls: 'bg-pink-400' },
@@ -153,14 +182,50 @@ async function deleteGoal(id, name) {
         <div
           v-for="child in appStore.children"
           :key="child.id"
-          class="flex items-center gap-3 bg-white rounded-2xl p-4 shadow-sm"
+          class="bg-white rounded-2xl shadow-sm overflow-hidden"
         >
-          <span class="w-8 h-8 rounded-full flex-shrink-0" :class="colorMap[child.color] || 'bg-orange-400'"></span>
-          <span class="flex-1 font-bold text-gray-700">{{ child.name }}</span>
-          <button
-            @click="deleteChild(child.id, child.name)"
-            class="text-red-400 hover:text-red-600 text-sm px-2"
-          >刪除</button>
+          <!-- 一般顯示 -->
+          <div v-if="editingChildId !== child.id" class="flex items-center gap-3 p-4">
+            <span class="w-8 h-8 rounded-full flex-shrink-0" :class="colorMap[child.color] || 'bg-orange-400'"></span>
+            <span class="flex-1 font-bold text-gray-700">{{ child.name }}</span>
+            <button
+              @click="startEdit(child)"
+              class="text-teal-500 hover:text-teal-700 text-sm px-2"
+            >編輯</button>
+            <button
+              @click="deleteChild(child.id, child.name)"
+              class="text-red-400 hover:text-red-600 text-sm px-2"
+            >刪除</button>
+          </div>
+
+          <!-- 編輯模式 -->
+          <div v-else class="p-4">
+            <p class="text-xs font-bold text-teal-600 mb-2">✏️ 編輯小孩資料</p>
+            <input
+              v-model="editingChildName"
+              class="w-full border-2 border-teal-200 rounded-xl px-3 py-2 text-sm mb-3 focus:outline-none focus:border-teal-400"
+              placeholder="小孩名字"
+              @keyup.enter="saveEdit"
+            />
+            <p class="text-xs text-gray-500 mb-2">選擇顏色</p>
+            <div class="flex gap-2 mb-3">
+              <button
+                v-for="c in colorOptions"
+                :key="c.value"
+                @click="editingChildColor = c.value"
+                class="w-8 h-8 rounded-full transition-all"
+                :class="[c.cls, editingChildColor === c.value ? 'ring-2 ring-offset-2 ring-gray-500 scale-110' : '']"
+              ></button>
+            </div>
+            <div class="flex gap-2">
+              <button @click="cancelEdit" class="flex-1 py-2 rounded-xl border-2 border-gray-200 text-gray-500 text-sm font-bold">取消</button>
+              <button
+                @click="saveEdit"
+                :disabled="childLoading || !editingChildName.trim()"
+                class="flex-1 py-2 rounded-xl bg-teal-500 text-white text-sm font-bold disabled:opacity-50"
+              >{{ childLoading ? '儲存中...' : '儲存' }}</button>
+            </div>
+          </div>
         </div>
         <div v-if="appStore.children.length === 0" class="text-center text-gray-400 text-sm py-4">
           還沒有小孩，點下方新增吧！

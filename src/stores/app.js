@@ -65,6 +65,18 @@ export const useAppStore = defineStore('app', () => {
     }
   }
 
+  async function updateChild(id, name, color) {
+    const { data, error } = await supabase
+      .from('children')
+      .update({ name, color })
+      .eq('id', id)
+      .select()
+      .single()
+    if (error) throw error
+    const idx = children.value.findIndex(c => c.id === id)
+    if (idx !== -1) children.value[idx] = data
+  }
+
   async function deleteChild(id) {
     const { error } = await supabase.from('children').delete().eq('id', id)
     if (error) throw error
@@ -235,7 +247,7 @@ export const useAppStore = defineStore('app', () => {
     children, currentChildId, currentChild,
     pointItems, pointRecords, goals, loading,
     totalPoints, recordsByDate, todayCheckedItemIds,
-    loadChildren, addChild, deleteChild, switchChild, loadChildData,
+    loadChildren, addChild, updateChild, deleteChild, switchChild, loadChildData,
     loadPointItems, addPointItem, deletePointItem,
     loadPointRecords, addPointRecord, removePointRecord, toggleDailyItem,
     loadGoals, addGoal, deleteGoal, redeemGoal,
