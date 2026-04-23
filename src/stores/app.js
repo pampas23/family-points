@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useAuthStore } from './auth'
+import { localToday } from '../lib/dateUtils'
 
 export const useAppStore = defineStore('app', () => {
   const children = ref([])
@@ -30,7 +31,7 @@ export const useAppStore = defineStore('app', () => {
   })
 
   const todayCheckedItemIds = computed(() => {
-    const today = new Date().toISOString().split('T')[0]
+    const today = localToday()
     const todayRecords = recordsByDate.value[today] || []
     return new Set(todayRecords.filter(r => r.item_id).map(r => r.item_id))
   })
@@ -158,7 +159,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function addPointRecord(itemId, itemName, points, date) {
-    const recordedAt = date || new Date().toISOString().split('T')[0]
+    const recordedAt = date || localToday()
     const { data, error } = await supabase
       .from('point_records')
       .insert({
@@ -193,7 +194,7 @@ export const useAppStore = defineStore('app', () => {
   }
 
   async function toggleDailyItem(item) {
-    const today = new Date().toISOString().split('T')[0]
+    const today = localToday()
     const existing = pointRecords.value.find(
       r => r.item_id === item.id && r.recorded_at === today
     )
@@ -260,7 +261,7 @@ export const useAppStore = defineStore('app', () => {
     if (goal.quantity_limit !== null && goal.quantity_used >= goal.quantity_limit) {
       throw new Error('已達兌換上限')
     }
-    const today = new Date().toISOString().split('T')[0]
+    const today = localToday()
     if (goal.expires_at && goal.expires_at < today) throw new Error('目標已過期')
 
     await addPointRecord(null, `兌換：${goal.name}`, -goal.required_points, null)

@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import { useAppStore } from '../stores/app'
 import draggable from 'vuedraggable'
+import { localToday } from '../lib/dateUtils'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -126,7 +127,7 @@ async function submitQuickAdd() {
 const isTodayRecordsCollapsed = ref(localStorage.getItem('todayRecordsCollapsed') === 'true')
 watch(isTodayRecordsCollapsed, val => localStorage.setItem('todayRecordsCollapsed', String(val)))
 
-const todayStr = new Date().toISOString().split('T')[0]
+const todayStr = localToday()
 
 const todayRecords = computed(() =>
   (appStore.recordsByDate[todayStr] || []).slice().sort(

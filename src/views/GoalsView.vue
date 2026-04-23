@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import { useAppStore } from '../stores/app'
 import { useRouter } from 'vue-router'
+import { localToday } from '../lib/dateUtils'
 
 const appStore = useAppStore()
 const router = useRouter()
@@ -10,7 +11,7 @@ const redeemingId = ref(null)
 const successMsg = ref('')
 const errorMsg = ref('')
 
-const today = new Date().toISOString().split('T')[0]
+const today = localToday()
 
 function isExpired(goal) {
   return goal.expires_at && goal.expires_at < today
